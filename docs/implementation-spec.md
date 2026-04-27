@@ -191,7 +191,7 @@ Implemented notes:
 
 ### Phase 3: Recorder Runtime
 
-Status: next phase.
+Status: completed.
 
 Deliverables:
 
@@ -202,7 +202,18 @@ Deliverables:
 - Session start/stop flow
 - Runtime permission handling for Wi-Fi-visible fields
 
+Implemented notes:
+
+- `RecorderService` starts as a `dataSync` Foreground Service for a persisted session ID.
+- The service runs separate Wi-Fi and probe loops using the interval values copied into the session row.
+- HTTP probes use GET and treat `2xx..3xx` as success. TCP probes use socket connect with the target timeout.
+- Notification includes an explicit stop action.
+- Runtime permission requirements are centralized in `RecorderPermissions` for the UI phase.
+- BLE remains excluded from the MVP runtime.
+
 ### Phase 4: Compose UI
+
+Status: next phase.
 
 Deliverables:
 
