@@ -213,7 +213,7 @@ Implemented notes:
 
 ### Phase 4: Compose UI
 
-Status: next phase.
+Status: completed.
 
 Deliverables:
 
@@ -223,6 +223,16 @@ Deliverables:
 - Settings screen
 - Manual event marker input
 - Manual export action through Storage Access Framework
+
+Implemented notes:
+
+- The first MVP UI supports one probe target per newly created session.
+- The database and repository remain capable of storing multiple targets for later expansion.
+- Sessions screen creates a session and starts the foreground recorder.
+- Detail screen shows summary metrics, targets, recent events, recent probe samples, stop action, event marker buttons, and manual zip export.
+- Settings screen updates Wi-Fi sample interval, probe interval, and probe timeout through DataStore.
+- Manual export uses Storage Access Framework `CreateDocument` and writes one zip file containing multiple CSV files.
+- Runtime permissions are requested from `MainActivity` at startup.
 
 ### Phase 5: Optional Enhancements
 

@@ -23,6 +23,7 @@ import com.miyabi0619.radiofieldrecorder.data.local.WifiSampleEntity
 import com.miyabi0619.radiofieldrecorder.settings.RecorderSettings
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 data class CreateSessionRequest(
     val name: String,
@@ -61,6 +62,9 @@ class RecordingRepository(
 
     fun observeSessions(): Flow<List<SessionEntity>> =
         sessionDao.observeSessions()
+
+    suspend fun getLatestSession(): SessionEntity? =
+        sessionDao.observeSessions().first().firstOrNull()
 
     suspend fun createSession(request: CreateSessionRequest): Long {
         require(request.name.isNotBlank()) { "Session name is required." }
@@ -113,6 +117,23 @@ class RecordingRepository(
 
     suspend fun addEvent(event: EventMarkerEntity): Long =
         eventMarkerDao.insert(event)
+
+    suspend fun addEvent(
+        sessionId: Long,
+        timestamp: Long,
+        type: String,
+        label: String,
+        memo: String?,
+    ): Long =
+        addEvent(
+            EventMarkerEntity(
+                sessionId = sessionId,
+                timestamp = timestamp,
+                type = type,
+                label = label,
+                memo = memo?.trim()?.ifBlank { null },
+            ),
+        )
 
     suspend fun getSessionDetail(sessionId: Long): SessionDetail? {
         val session = sessionDao.getSession(sessionId) ?: return null
