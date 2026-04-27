@@ -27,6 +27,14 @@
                 android:exported="false"
                 android:foregroundServiceType="dataSync" />
 
+        <receiver
+                android:name=".external.ExternalEventReceiver"
+                android:exported="true">
+            <intent-filter>
+                <action android:name="com.miyabi0619.radiofieldrecorder.EXTERNAL_EVENT" />
+            </intent-filter>
+        </receiver>
+
         <activity
                 android:name=".MainActivity"
                 android:exported="true"

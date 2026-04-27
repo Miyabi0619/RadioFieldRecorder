@@ -185,6 +185,11 @@ private class FakeSessionDao : SessionDao {
 
     override suspend fun getSession(sessionId: Long): SessionEntity? =
         sessions.firstOrNull { it.id == sessionId }
+
+    override suspend fun getLatestSessionByStatus(status: SessionStatus): SessionEntity? =
+        sessions
+            .filter { it.status == status }
+            .maxByOrNull { it.startedAt }
 }
 
 private class FakeProbeTargetDao : ProbeTargetDao {

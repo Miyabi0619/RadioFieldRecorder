@@ -53,8 +53,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.miyabi0619.radiofieldrecorder.data.local.SessionEntity
 import com.miyabi0619.radiofieldrecorder.data.local.SessionStatus
-import com.miyabi0619.radiofieldrecorder.data.local.StoredProbeTargetType
 import com.miyabi0619.radiofieldrecorder.data.repository.SessionDetail
+import com.miyabi0619.radiofieldrecorder.diagnostics.DiagnosticCommentGenerator
 import com.miyabi0619.radiofieldrecorder.recorder.RecorderPermissions
 import com.miyabi0619.radiofieldrecorder.settings.RecorderSettings
 import com.miyabi0619.radiofieldrecorder.ui.RadioFieldRecorderViewModel
@@ -433,6 +433,10 @@ private fun SummaryCard(detail: SessionDetail) {
             Text("Average RSSI: ${formatDouble(detail.summary.averageWifiRssi)} dBm")
             Text("Minimum RSSI: ${detail.summary.minWifiRssi ?: "-"} dBm")
             Text("Events: ${detail.summary.eventCount}")
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+            DiagnosticCommentGenerator.generate(detail.summary).forEach { comment ->
+                Text(comment, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

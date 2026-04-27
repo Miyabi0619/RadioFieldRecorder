@@ -28,6 +28,18 @@ interface SessionDao {
 
     @Query("SELECT * FROM sessions WHERE id = :sessionId")
     suspend fun getSession(sessionId: Long): SessionEntity?
+
+    @Query(
+        """
+        SELECT * FROM sessions
+        WHERE status = :status
+        ORDER BY startedAt DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun getLatestSessionByStatus(
+        status: SessionStatus = SessionStatus.RUNNING,
+    ): SessionEntity?
 }
 
 @Dao

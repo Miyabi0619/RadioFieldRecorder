@@ -236,6 +236,8 @@ Implemented notes:
 
 ### Phase 5: Optional Enhancements
 
+Status: completed for MVP polish.
+
 Deliverables:
 
 - BLE surroundings monitor
@@ -244,6 +246,29 @@ Deliverables:
 - External app event receiver
 - Graph display
 - Simple diagnostic comments
+
+Implemented notes:
+
+- Simple diagnostic comments are generated from session summary metrics and displayed on the detail screen.
+- External app events can be sent with a broadcast action:
+  `com.miyabi0619.radiofieldrecorder.EXTERNAL_EVENT`
+- External broadcast extras:
+  `source`, `type`, `label`, `value`, `memo`, `timestamp`
+- `type` is required. Events are stored only when a recording session is currently running.
+- External events are stored as event markers with an `EXTERNAL_` prefix.
+- BLE, graph display, and Markdown report export remain future optional enhancements.
+
+Example external event command:
+
+```sh
+adb shell am broadcast \
+  -a com.miyabi0619.radiofieldrecorder.EXTERNAL_EVENT \
+  --es source robot_app \
+  --es type BT_TIMEOUT \
+  --es label "BT timeout" \
+  --es value "ack=missing" \
+  --es memo "during turn command"
+```
 
 ## Test Policy
 

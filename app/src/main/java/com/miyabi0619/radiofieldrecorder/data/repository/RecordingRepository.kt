@@ -66,6 +66,9 @@ class RecordingRepository(
     suspend fun getLatestSession(): SessionEntity? =
         sessionDao.observeSessions().first().firstOrNull()
 
+    suspend fun getLatestRunningSession(): SessionEntity? =
+        sessionDao.getLatestSessionByStatus(SessionStatus.RUNNING)
+
     suspend fun createSession(request: CreateSessionRequest): Long {
         require(request.name.isNotBlank()) { "Session name is required." }
         require(request.settings.wifiSampleIntervalMs > 0) {
