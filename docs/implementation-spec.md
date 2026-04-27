@@ -158,7 +158,7 @@ No automatic export is performed.
 
 ### Phase 1: Spec and Core Logic
 
-Status: current phase.
+Status: completed.
 
 Deliverables:
 
@@ -173,6 +173,8 @@ No Android service, Room, DataStore, or UI changes are included in this phase.
 
 ### Phase 2: Persistence and Settings
 
+Status: completed.
+
 Deliverables:
 
 - Room entities and DAOs
@@ -180,7 +182,16 @@ Deliverables:
 - DataStore settings for sample intervals and timeouts
 - Unit tests for summary and export repository behavior where possible
 
+Implemented notes:
+
+- Room database version `1` stores sessions, HTTP/TCP targets, Wi-Fi samples, probe samples, and manual event markers.
+- Session rows persist the recording intervals and optional ROS domain ID used at session start.
+- Repository tests use fake DAOs to verify session creation, target insertion, sample insertion, and summary assembly without requiring a device.
+- Room schema export is enabled under `app/schemas/`.
+
 ### Phase 3: Recorder Runtime
+
+Status: next phase.
 
 Deliverables:
 
