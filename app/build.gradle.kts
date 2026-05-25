@@ -6,6 +6,8 @@ plugins {
 
 android {
     namespace = "com.miyabi0619.radiofieldrecorder"
+    ndkVersion = "27.2.12479018"
+
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -20,6 +22,21 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters.clear()
+            abiFilters += listOf("arm64-v8a")
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
+                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384",
+                    "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,max-page-size=16384",
+                )
+            }
+        }
     }
 
     buildTypes {
@@ -37,6 +54,18 @@ android {
     }
     buildFeatures {
         compose = true
+        prefab = true
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 }
 
@@ -49,6 +78,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
+    implementation("io.github.eyr1n:fastdds-prefab:2.13.4.3")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

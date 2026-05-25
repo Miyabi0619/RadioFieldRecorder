@@ -2,26 +2,61 @@
 
 ## Scope
 
-Radio Field Recorder records Wi-Fi state, HTTP/TCP reachability, and manual event markers on an Android device. The first MVP does not monitor ROS2, Fast DDS internals, DDS discovery, packet contents, Bluetooth payloads, or BLE surroundings.
+Radio Field Recorder is an Android "drive recorder" for ROS2 field communication.
 
-The goal is to decide the next investigation target when a ROS2/Fast DDS/Bluetooth application becomes unstable:
+The app records what the Android device could observe around the time a ROS2 robot
+or controller became unstable. The primary target is not generic HTTP/TCP reachability,
+but ROS2/DDS discovery visibility between the Android device and the ROS2 PC.
 
-- If Radio Field Recorder also shows Wi-Fi or IP failures, investigate radio, AP, host, firewall, or route first.
-- If Radio Field Recorder remains healthy, investigate ROS2, DDS, QoS, domain ID, JNI/C++, or application logic first.
+The current direction is:
+
+- Record Wi-Fi state over time.
+- Join the configured ROS2 DDS domain without publishing robot-control data.
+- Record discovered remote DDS participants.
+- Record discovered remote topic endpoints, meaning remote readers and writers.
+- Record manual event markers such as delay, disconnect, recovery, ROS2 issue, and memo.
+- Export a time-aligned artifact for later investigation.
+
+The app must not publish to robot-control topics as part of health checking. A successful
+publish is not used as the main communication check, because it can accidentally affect
+the robot and does not prove that the remote application processed the sample.
+
+## Goal
+
+When a ROS2/Fast DDS/Bluetooth application becomes unstable, the user should be able to
+look back and decide the next investigation target:
+
+- If Wi-Fi state is poor and DDS participants/endpoints disappear, investigate radio,
+  AP, route, host, or firewall conditions first.
+- If Wi-Fi looks healthy but DDS participants or expected topic endpoints disappear,
+  investigate ROS2 domain, DDS discovery, multicast/unicast transport, QoS, or host-side
+  DDS configuration.
+- If Wi-Fi and DDS discovery remain healthy, investigate topic payload handling, QoS
+  compatibility at the application level, JNI/C++, Bluetooth, or application logic.
+
+This app is a recorder and diagnostic aid. It is not a complete ROS2 graph inspector and
+does not prove that every ROS2 message payload is semantically valid.
 
 ## Confirmed Decisions
 
-- BLE is excluded from the MVP.
+- BLE surroundings monitoring is excluded from the primary MVP.
 - A recording session is assumed to be shorter than 6 hours.
-- Probe targets are explicitly typed as `HTTP` or `TCP`.
-- Measurement intervals start as fixed defaults, with a settings screen added later.
+- The primary ROS2 check is DDS discovery visibility, not HTTP or TCP probing.
+- The app should not publish robot-control data for health checks.
+- Level 1 and Level 2 DDS checks are in scope:
+  - Level 1: remote DDS participant detection.
+  - Level 2: remote topic endpoint detection.
+- Level 3 publish/ack round-trip is out of scope for now.
+- HTTP/TCP probes may remain as optional auxiliary diagnostics, but they are not the main
+  ROS2 communication judgment.
 - CSV export is manual. The app exports only when the user presses an export button.
-- CSV export may contain multiple files, but a single user action should produce one export artifact.
-- DDS support in MVP means DDS/RTPS helper metadata, not DDS protocol monitoring.
+- CSV export may contain multiple files, but one user action should produce one export
+  artifact, preferably a zip file.
 
 ## Android Baseline
 
 - Language: Kotlin
+- Native communication layer: C++ + JNI + Fast DDS prefab
 - UI: Jetpack Compose + Material3
 - State: ViewModel + StateFlow
 - Persistence: Room
@@ -30,11 +65,102 @@ The goal is to decide the next investigation target when a ROS2/Fast DDS/Bluetoo
 - Export: Storage Access Framework with a user-selected destination
 - Current project baseline: `minSdk 31`, `targetSdk 36`, `compileSdk 36.1`
 
-Foreground Service type for the MVP should start with `dataSync`, because the MVP records local samples and performs active probes for less than 6 hours. If BLE or external device interaction becomes part of recording, `connectedDevice` should be reconsidered with the relevant runtime permissions.
+Foreground Service type for the recorder should start with `dataSync`, because the app
+records local samples and DDS discovery metadata for less than 6 hours. If BLE or direct
+external device interaction becomes part of recording, `connectedDevice` should be
+reconsidered with the relevant runtime permissions.
 
-## MVP Features
+## Native DDS Strategy
 
-### Session Management
+The app should use the Fast DDS prefab dependency from this repository's `local-maven/`
+directory. Other local checkout paths must not be required for a clean build after
+cloning this repository.
+
+`/Users/soraha/StudioProjects/RC26_R1_Controller` may be used only as a reference
+implementation while developing, not as a build-time dependency.
+
+Expected reuse:
+
+- `io.github.eyr1n:fastdds-prefab:2.13.4.3`
+- Repository-local Maven artifact under `local-maven/`
+- Gradle `prefab = true`
+- CMake / NDK / ABI / linker flag setup
+- `DomainParticipant` creation pattern
+- JNI bridge pattern between Kotlin and C++
+
+Expected new implementation:
+
+- App-specific JNI function names.
+- A `DdsDiscoveryMonitor` native component.
+- A Kotlin `DdsDiscoveryNativeBridge` or equivalent wrapper.
+- Room entities for DDS participant and endpoint observations.
+- Recorder integration that starts/stops DDS discovery monitoring per session.
+
+Generated ROS2 message `PubSubTypes` are not required for Level 1 and Level 2 monitoring.
+The app observes DDS discovery metadata and does not deserialize topic payloads.
+
+Generated message types become necessary only if a future phase subscribes to payloads or
+publishes diagnostic samples.
+
+## DDS Discovery Semantics
+
+The DDS monitor creates a local `DomainParticipant` in the configured `ROS_DOMAIN_ID`.
+
+This is not fully passive packet sniffing. The Android app will participate in DDS
+discovery and emit normal discovery traffic. However, it must not create data writers for
+robot-control topics or publish control samples.
+
+The monitor should record:
+
+- Local monitor start/stop time.
+- ROS domain ID.
+- Remote participant discovery events.
+- Remote participant removal/loss events when available.
+- Remote data writer discovery events.
+- Remote data reader discovery events.
+- Topic name.
+- Type name.
+- Endpoint kind: writer or reader.
+- Remote GUID or stable identifier if available.
+- QoS metadata when available and cheap to capture.
+- First seen timestamp.
+- Last seen timestamp.
+- Current visible/lost status.
+
+The Level 1 communication signal is:
+
+- At least one expected remote participant is visible, or
+- At least one remote participant is visible when no expected participant filter is set.
+
+The Level 2 communication signal is:
+
+- Expected topic endpoints are visible for the configured topic names, or
+- Remote topic endpoints are being discovered when no expected topic filter is set.
+
+The app should label these signals as "DDS discovery visibility" or "DDS endpoint
+visibility", not as "message delivery success".
+
+## Expected Topic Configuration
+
+The app should allow a session to optionally store expected topic names.
+
+Each expected topic stores:
+
+- `id`
+- `sessionId`
+- `topicName`
+- `expectedKind`: `WRITER`, `READER`, or `ANY`
+- `typeName`, optional
+- `required`, boolean
+- `memo`, optional
+
+The app should not publish test messages to expected topics.
+
+Topic name handling should respect ROS2 DDS naming as observed by Fast DDS. For example,
+ROS2 topic `/foo` may appear as DDS topic `rt/foo`. The UI should help the user avoid
+confusing ROS topic names and DDS topic names.
+
+## Session Management
 
 Each session stores:
 
@@ -44,48 +170,18 @@ Each session stores:
 - `startedAt`
 - `endedAt`
 - `status`
+- `rosDomainId`
 - `wifiSampleIntervalMs`
-- `probeIntervalMs`
-- `probeTimeoutMs`
+- `ddsSnapshotIntervalMs`
+- `discoveryLeaseDurationMs`, optional
+- `expectedParticipant`, optional
 
-### Probe Targets
+Existing HTTP/TCP interval fields may remain for compatibility, but the new primary
+recorder settings should be named around DDS discovery.
 
-Each target stores:
+## Wi-Fi Samples
 
-- `id`
-- `sessionId`
-- `label`
-- `type`: `HTTP` or `TCP`
-- `address`
-- `port`
-- `path`
-- `timeoutMs`
-
-HTTP targets require an `http://` or `https://` URL.
-
-TCP targets require a host or IP address and a port from `1..65535`.
-
-### DDS Helper
-
-The app does not open DDS participants or inspect DDS traffic. It can store ROS domain context and display RTPS default UDP port candidates to help users choose related probe targets or interpret network conditions.
-
-Default RTPS port formula:
-
-- `portBase = 7400`
-- `domainIdGain = 250`
-- `participantIdGain = 2`
-- `builtinMulticastOffset = 0`
-- `builtinUnicastOffset = 10`
-- `userMulticastOffset = 1`
-- `userUnicastOffset = 11`
-
-For example, domain ID `0` and participant ID `0` produce `7400`, `7410`, `7401`, and `7411`.
-
-UDP reachability is not treated as a success/failure probe in the MVP, because UDP does not provide TCP-like connect semantics. For reliable probing, use HTTP health endpoints or TCP ports.
-
-### Wi-Fi Samples
-
-The recorder periodically stores the currently connected Wi-Fi state:
+The recorder periodically stores the currently connected network state:
 
 - `timestamp`
 - `ssid`
@@ -97,20 +193,53 @@ The recorder periodically stores the currently connected Wi-Fi state:
 
 The MVP does not perform high-frequency Wi-Fi scans.
 
-### Probe Samples
+## DDS Participant Samples
 
-For each HTTP/TCP target, the recorder periodically stores:
+For each discovery snapshot or event, the recorder stores participant visibility:
 
 - `timestamp`
-- `targetId`
-- `targetLabel`
-- `success`
-- `latencyMs`
-- `errorMessage`
+- `sessionId`
+- `participantKey` or `guid`
+- `participantName`, optional
+- `hostInfo`, optional if available
+- `status`: `VISIBLE`, `LOST`, or `UNKNOWN`
+- `firstSeenAt`
+- `lastSeenAt`
+- `rawSummary`, optional diagnostic text
 
-HTTP uses GET. TCP uses socket connect.
+## DDS Endpoint Samples
 
-### Event Markers
+For each discovered topic endpoint, the recorder stores:
+
+- `timestamp`
+- `sessionId`
+- `endpointKey` or `guid`
+- `participantKey`, optional
+- `topicName`
+- `typeName`
+- `kind`: `WRITER` or `READER`
+- `status`: `VISIBLE`, `LOST`, or `UNKNOWN`
+- `firstSeenAt`
+- `lastSeenAt`
+- `qosSummary`, optional
+
+## Auxiliary HTTP/TCP Probes
+
+HTTP/TCP probes are optional auxiliary diagnostics.
+
+They may be useful for:
+
+- Checking SSH or another known TCP service.
+- Checking a deliberately provided HTTP health endpoint.
+- Separating basic IP reachability problems from DDS discovery problems.
+
+They are not sufficient to prove ROS2 communication health.
+
+TCP probing requires a host and port because TCP connect semantics always target a
+specific socket endpoint. `ROS_DOMAIN_ID` does not define a TCP port for normal ROS2 DDS
+communication.
+
+## Event Markers
 
 The recording screen provides preset event buttons:
 
@@ -130,154 +259,156 @@ Each event stores:
 - `label`
 - `memo`
 
-### Summary
+## Summary
 
-Session details display:
+Session details should display:
 
-- Average successful latency
-- Maximum successful latency
-- p95 successful latency
-- Probe failure rate
-- Average Wi-Fi RSSI
-- Minimum Wi-Fi RSSI
-- Event list
-- Time-ordered sample log
+- DDS participant visibility over time.
+- Expected participant visible ratio.
+- DDS endpoint visibility over time.
+- Expected topic endpoint visible ratio.
+- Participant lost/recovered event list.
+- Endpoint lost/recovered event list.
+- Average Wi-Fi RSSI.
+- Minimum Wi-Fi RSSI.
+- Optional auxiliary HTTP/TCP probe metrics.
+- Manual event list.
+- Time-ordered sample log.
 
-### Manual Export
+Diagnostic comments should prefer DDS terminology:
 
-The export button should create one user-selected artifact, preferably a zip file containing:
+- If expected participants disappear, mention DDS discovery or network reachability.
+- If expected endpoints disappear while participants remain visible, mention topic,
+  QoS, node lifecycle, or DDS endpoint creation.
+- If Wi-Fi RSSI is weak around disappearance events, mention radio/AP conditions.
+- If Wi-Fi and DDS discovery look stable, point investigation toward application,
+  Bluetooth, payload handling, or robot-side logic.
+
+## Manual Export
+
+The export button should create one user-selected artifact, preferably a zip file
+containing:
 
 - `summary.csv`
 - `wifi_samples.csv`
-- `probe_samples.csv`
+- `dds_participants.csv`
+- `dds_endpoints.csv`
+- `expected_topics.csv`
 - `events.csv`
+- `auxiliary_probe_samples.csv`, if HTTP/TCP probes are enabled
+- `conditions.csv`
 
 No automatic export is performed.
 
 ## Implementation Phases
 
-### Phase 1: Spec and Core Logic
+### Phase 0: Existing HTTP/TCP MVP
 
-Status: completed.
-
-Deliverables:
-
-- Implementation spec in `docs/`
-- Probe target validation and normalization
-- DDS/RTPS port candidate calculation
-- Session summary calculation
-- CSV formatting helpers
-- Unit tests for expected inputs and outputs
-
-No Android service, Room, DataStore, or UI changes are included in this phase.
-
-### Phase 2: Persistence and Settings
-
-Status: completed.
-
-Deliverables:
-
-- Room entities and DAOs
-- Repository layer
-- DataStore settings for sample intervals and timeouts
-- Unit tests for summary and export repository behavior where possible
+Status: implemented before the DDS direction change.
 
 Implemented notes:
 
-- Room database version `1` stores sessions, HTTP/TCP targets, Wi-Fi samples, probe samples, and manual event markers.
-- Session rows persist the recording intervals and optional ROS domain ID used at session start.
-- Repository tests use fake DAOs to verify session creation, target insertion, sample insertion, and summary assembly without requiring a device.
-- Room schema export is enabled under `app/schemas/`.
+- Room database version `1` stores sessions, HTTP/TCP targets, Wi-Fi samples, probe
+  samples, and manual event markers.
+- Foreground `RecorderService` records Wi-Fi samples and HTTP/TCP probe samples.
+- Compose UI supports session creation, detail display, settings, event markers, and zip
+  export.
+- Runtime permission requirements are centralized in `RecorderPermissions`.
+- Simple diagnostic comments and external app event receiver exist.
 
-### Phase 3: Recorder Runtime
+This phase is retained as a compatibility baseline, but it is no longer the main product
+direction.
 
-Status: completed.
+### Phase 1: DDS Discovery Design
 
-Deliverables:
-
-- Foreground `RecorderService`
-- Notification channel and ongoing notification
-- Wi-Fi monitor
-- HTTP/TCP probe runner
-- Session start/stop flow
-- Runtime permission handling for Wi-Fi-visible fields
-
-Implemented notes:
-
-- `RecorderService` starts as a `dataSync` Foreground Service for a persisted session ID.
-- The service runs separate Wi-Fi and probe loops using the interval values copied into the session row.
-- HTTP probes use GET and treat `2xx..3xx` as success. TCP probes use socket connect with the target timeout.
-- Notification includes an explicit stop action.
-- Runtime permission requirements are centralized in `RecorderPermissions` for the UI phase.
-- BLE remains excluded from the MVP runtime.
-
-### Phase 4: Compose UI
-
-Status: completed.
+Status: pending.
 
 Deliverables:
 
-- Session list screen
-- Recording screen
-- Session detail screen
-- Settings screen
-- Manual event marker input
-- Manual export action through Storage Access Framework
+- Finalize native monitor API shape.
+- Define Room entities for DDS participant and endpoint samples.
+- Define Kotlin models for discovery snapshots.
+- Define UI labels that clearly distinguish discovery visibility from message delivery.
+- Define export CSV columns for participants and endpoints.
 
-Implemented notes:
+### Phase 2: Native Fast DDS Discovery Monitor
 
-- The first MVP UI supports one probe target per newly created session.
-- The database and repository remain capable of storing multiple targets for later expansion.
-- Sessions screen creates a session and starts the foreground recorder.
-- Detail screen shows summary metrics, targets, recent events, recent probe samples, stop action, event marker buttons, and manual zip export.
-- Settings screen updates Wi-Fi sample interval, probe interval, and probe timeout through DataStore.
-- Manual export uses Storage Access Framework `CreateDocument` and writes one zip file containing multiple CSV files.
-- Runtime permissions are requested from `MainActivity` at startup.
-
-### Phase 5: Optional Enhancements
-
-Status: completed for MVP polish.
+Status: pending.
 
 Deliverables:
 
-- BLE surroundings monitor
-- Specific BLE target tracking
-- Markdown report export
-- External app event receiver
-- Graph display
-- Simple diagnostic comments
+- Add Fast DDS prefab dependency and CMake configuration to this app.
+- Add `participant_manager.cpp/.h` or equivalent participant ownership helper.
+- Add `dds_discovery_monitor.cpp/.h`.
+- Implement native start/stop for a configured ROS domain ID.
+- Implement participant discovery callbacks.
+- Implement reader/writer endpoint discovery callbacks.
+- Expose snapshots or callback events to Kotlin through JNI.
+- Add basic native error reporting.
 
-Implemented notes:
+The monitor must not create robot-control publishers or publish samples.
 
-- Simple diagnostic comments are generated from session summary metrics and displayed on the detail screen.
-- External app events can be sent with a broadcast action:
-  `com.miyabi0619.radiofieldrecorder.EXTERNAL_EVENT`
-- External broadcast extras:
-  `source`, `type`, `label`, `value`, `memo`, `timestamp`
-- `type` is required. Events are stored only when a recording session is currently running.
-- External events are stored as event markers with an `EXTERNAL_` prefix.
-- BLE, graph display, and Markdown report export remain future optional enhancements.
+### Phase 3: Persistence and Recorder Integration
 
-Example external event command:
+Status: pending.
 
-```sh
-adb shell am broadcast \
-  -a com.miyabi0619.radiofieldrecorder.EXTERNAL_EVENT \
-  --es source robot_app \
-  --es type BT_TIMEOUT \
-  --es label "BT timeout" \
-  --es value "ack=missing" \
-  --es memo "during turn command"
-```
+Deliverables:
+
+- Add Room entities and DAOs for DDS participants, endpoints, and expected topics.
+- Add repository methods for discovery event insertion and summary assembly.
+- Start and stop the native DDS monitor from the foreground recorder.
+- Periodically persist current DDS visibility snapshots.
+- Preserve Wi-Fi sampling.
+- Keep HTTP/TCP probes as optional auxiliary probes.
+
+### Phase 4: Compose UI Rework
+
+Status: pending.
+
+Deliverables:
+
+- Make `ROS_DOMAIN_ID` a primary session setting.
+- Add expected participant/topic configuration.
+- Show current DDS participant count and endpoint count.
+- Show expected topic endpoint status.
+- Move HTTP/TCP setup into an auxiliary diagnostics section.
+- Update Japanese UI copy so TCP is not presented as ROS2 communication judgment.
+
+### Phase 5: Export and Diagnostics Rework
+
+Status: pending.
+
+Deliverables:
+
+- Export DDS participant and endpoint CSV files.
+- Add DDS-oriented summary metrics.
+- Add DDS-oriented diagnostic comments.
+- Add time-ordered combined log that aligns Wi-Fi, DDS, auxiliary probes, and events.
+
+### Future Optional Enhancements
+
+Status: future.
+
+Potential enhancements:
+
+- Subscribe to selected safe read-only topics and record last receive time.
+- Decode selected message payloads when generated `PubSubTypes` are available.
+- Add graph display for participant/topic visibility.
+- Add Markdown report export.
+- Add BLE surroundings monitor.
+- Add Level 3 diagnostic publish/ack only for explicitly safe diagnostic topics.
 
 ## Test Policy
 
 Tests should first cover deterministic logic:
 
-- TCP target validation rejects missing or invalid ports.
-- HTTP target validation rejects non-HTTP schemes.
-- DDS port calculation matches expected RTPS candidates.
-- Summary calculation produces expected average, maximum, p95, failure rate, and RSSI values.
-- CSV formatter escapes commas, quotes, and newlines correctly.
+- DDS discovery snapshot merging updates first seen / last seen / visible status correctly.
+- Expected topic matching handles ROS topic names and DDS topic names consistently.
+- Session summary calculates participant visible ratio and endpoint visible ratio.
+- Export builder includes DDS participant and endpoint CSV files.
+- Existing CSV formatter escapes commas, quotes, and newlines correctly.
+- Existing HTTP/TCP parser tests remain as auxiliary probe coverage.
 
-Android integration tests should be added after Room, service, and UI behavior exist.
+Native integration tests should be added after the C++ monitor exists. Where full DDS
+integration is difficult on CI, isolate Kotlin-side snapshot merging and persistence logic
+with fake discovery event sources.
