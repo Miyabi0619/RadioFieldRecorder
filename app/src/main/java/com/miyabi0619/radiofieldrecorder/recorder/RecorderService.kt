@@ -67,7 +67,7 @@ class RecorderService : Service() {
 
     private fun handleStart(intent: Intent) {
         val sessionId = intent.getLongExtra(ExtraSessionId, MissingSessionId)
-        val sessionName = intent.getStringExtra(ExtraSessionName) ?: "Recording"
+        val sessionName = intent.getStringExtra(ExtraSessionName) ?: "記録"
         if (sessionId == MissingSessionId) {
             stopSelf()
             return

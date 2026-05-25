@@ -169,9 +169,9 @@ enum class AppDestination(
     val label: String,
     val icon: ImageVector,
 ) {
-    SESSIONS("Sessions", Icons.Default.Home),
-    DETAIL("Detail", Icons.Default.Favorite),
-    SETTINGS("Settings", Icons.Default.AccountBox),
+    SESSIONS("セッション", Icons.Default.Home),
+    DETAIL("詳細", Icons.Default.Favorite),
+    SETTINGS("設定", Icons.Default.AccountBox),
 }
 
 @Composable
@@ -188,9 +188,9 @@ private fun SessionsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Radio Field Recorder", style = MaterialTheme.typography.headlineSmall)
+            Text("電波フィールド記録", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Record Wi-Fi state, HTTP/TCP reachability, and manual events.",
+                "Wi-Fi状態、HTTP/TCP疎通、手動イベントを記録します。",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -211,7 +211,7 @@ private fun SessionsScreen(
 private fun NewSessionCard(
     onStart: (StartRecordingInput) -> Unit,
 ) {
-    var sessionName by rememberSaveable { mutableStateOf("Field session") }
+    var sessionName by rememberSaveable { mutableStateOf("フィールド記録") }
     var memo by rememberSaveable { mutableStateOf("") }
     var targetType by rememberSaveable { mutableStateOf(TargetInputType.HTTP) }
     var targetLabel by rememberSaveable { mutableStateOf("ROS2 PC") }
@@ -225,17 +225,17 @@ private fun NewSessionCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("New recording", style = MaterialTheme.typography.titleMedium)
+            Text("新規記録", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = sessionName,
                 onValueChange = { sessionName = it },
-                label = { Text("Session name") },
+                label = { Text("セッション名") },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = memo,
                 onValueChange = { memo = it },
-                label = { Text("Memo") },
+                label = { Text("メモ") },
                 modifier = Modifier.fillMaxWidth(),
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -253,7 +253,7 @@ private fun NewSessionCard(
             OutlinedTextField(
                 value = targetLabel,
                 onValueChange = { targetLabel = it },
-                label = { Text("Target label") },
+                label = { Text("ターゲット名") },
                 modifier = Modifier.fillMaxWidth(),
             )
             if (targetType == TargetInputType.HTTP) {
@@ -268,13 +268,13 @@ private fun NewSessionCard(
                     OutlinedTextField(
                         value = tcpHost,
                         onValueChange = { tcpHost = it },
-                        label = { Text("TCP host") },
+                        label = { Text("TCPホスト") },
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
                         value = tcpPort,
                         onValueChange = { tcpPort = it },
-                        label = { Text("Port") },
+                        label = { Text("ポート") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(0.55f),
                     )
@@ -303,7 +303,7 @@ private fun NewSessionCard(
                     )
                 },
             ) {
-                Text("Start recording")
+                Text("記録を開始")
             }
         }
     }
@@ -325,14 +325,14 @@ private fun SessionRow(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(session.name, style = MaterialTheme.typography.titleMedium)
-                Text(session.status.name, style = MaterialTheme.typography.labelMedium)
+                Text(formatSessionStatus(session.status), style = MaterialTheme.typography.labelMedium)
             }
-            Text("Started ${formatTime(session.startedAt)}")
-            session.endedAt?.let { Text("Stopped ${formatTime(it)}") }
+            Text("開始 ${formatTime(session.startedAt)}")
+            session.endedAt?.let { Text("停止 ${formatTime(it)}") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onSelect) { Text("Open") }
+                TextButton(onClick = onSelect) { Text("開く") }
                 if (session.status == SessionStatus.RUNNING) {
-                    TextButton(onClick = onStop) { Text("Stop") }
+                    TextButton(onClick = onStop) { Text("停止") }
                 }
             }
         }
@@ -349,7 +349,7 @@ private fun DetailScreen(
 ) {
     if (detail == null) {
         Column(modifier = modifier.padding(16.dp)) {
-            Text("Select a session from Sessions.")
+            Text("セッション一覧から選択してください。")
         }
         return
     }
@@ -363,14 +363,14 @@ private fun DetailScreen(
     ) {
         item {
             Text(detail.session.name, style = MaterialTheme.typography.headlineSmall)
-            Text("Started ${formatTime(detail.session.startedAt)}")
-            detail.session.endedAt?.let { Text("Stopped ${formatTime(it)}") }
-            Text("Wi-Fi ${detail.session.wifiSampleIntervalMs}ms / Probe ${detail.session.probeIntervalMs}ms")
+            Text("開始 ${formatTime(detail.session.startedAt)}")
+            detail.session.endedAt?.let { Text("停止 ${formatTime(it)}") }
+            Text("Wi-Fi ${detail.session.wifiSampleIntervalMs}ms / 疎通確認 ${detail.session.probeIntervalMs}ms")
             detail.session.rosDomainId?.let { Text("ROS_DOMAIN_ID $it") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onExport(detail.session.id) }) { Text("Export zip") }
+                Button(onClick = { onExport(detail.session.id) }) { Text("ZIP出力") }
                 if (isRunning) {
-                    Button(onClick = { onStop(detail.session.id) }) { Text("Stop") }
+                    Button(onClick = { onStop(detail.session.id) }) { Text("停止") }
                 }
             }
         }
@@ -389,27 +389,27 @@ private fun DetailScreen(
             )
         }
         item {
-            Text("Targets", style = MaterialTheme.typography.titleMedium)
+            Text("ターゲット", style = MaterialTheme.typography.titleMedium)
             detail.targets.forEach { target ->
                 Text("${target.label}: ${target.type} ${target.address}${target.port?.let { ":$it" } ?: ""}")
             }
         }
         item {
-            Text("Events", style = MaterialTheme.typography.titleMedium)
+            Text("イベント", style = MaterialTheme.typography.titleMedium)
             if (detail.events.isEmpty()) {
-                Text("No events.")
+                Text("イベントはまだありません。")
             } else {
                 detail.events.takeLast(20).forEach { event ->
-                    Text("${formatTime(event.timestamp)} ${event.type} ${event.memo.orEmpty()}")
+                    Text("${formatTime(event.timestamp)} ${formatEventType(event.type)} ${event.memo.orEmpty()}")
                 }
             }
         }
         item {
-            Text("Recent probes", style = MaterialTheme.typography.titleMedium)
+            Text("最近の疎通確認", style = MaterialTheme.typography.titleMedium)
             detail.probeSamples.takeLast(20).forEach { sample ->
                 Text(
                     "${formatTime(sample.timestamp)} ${sample.targetLabel} " +
-                        "${if (sample.success) "OK" else "NG"} " +
+                        "${if (sample.success) "成功" else "失敗"} " +
                         "${sample.latencyMs?.let { "${it}ms" } ?: sample.errorMessage.orEmpty()}",
                 )
             }
@@ -424,15 +424,15 @@ private fun SummaryCard(detail: SessionDetail) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("Summary", style = MaterialTheme.typography.titleMedium)
-            Text("Probe count: ${detail.summary.probeCount}")
-            Text("Failure rate: ${formatPercent(detail.summary.probeFailureRate)}")
-            Text("Average latency: ${formatDouble(detail.summary.averageLatencyMs)} ms")
-            Text("Max latency: ${detail.summary.maxLatencyMs ?: "-"} ms")
-            Text("p95 latency: ${detail.summary.p95LatencyMs ?: "-"} ms")
-            Text("Average RSSI: ${formatDouble(detail.summary.averageWifiRssi)} dBm")
-            Text("Minimum RSSI: ${detail.summary.minWifiRssi ?: "-"} dBm")
-            Text("Events: ${detail.summary.eventCount}")
+            Text("サマリー", style = MaterialTheme.typography.titleMedium)
+            Text("疎通確認数: ${detail.summary.probeCount}")
+            Text("失敗率: ${formatPercent(detail.summary.probeFailureRate)}")
+            Text("平均レイテンシ: ${formatDouble(detail.summary.averageLatencyMs)} ms")
+            Text("最大レイテンシ: ${detail.summary.maxLatencyMs ?: "-"} ms")
+            Text("p95レイテンシ: ${detail.summary.p95LatencyMs ?: "-"} ms")
+            Text("平均RSSI: ${formatDouble(detail.summary.averageWifiRssi)} dBm")
+            Text("最小RSSI: ${detail.summary.minWifiRssi ?: "-"} dBm")
+            Text("イベント数: ${detail.summary.eventCount}")
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
             DiagnosticCommentGenerator.generate(detail.summary).forEach { comment ->
                 Text(comment, style = MaterialTheme.typography.bodySmall)
@@ -453,21 +453,21 @@ private fun EventMarkerCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Event marker", style = MaterialTheme.typography.titleMedium)
+            Text("イベントマーカー", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = memo,
                 onValueChange = onMemoChange,
-                label = { Text("Memo") },
+                label = { Text("メモ") },
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EventTypes.forEach { type ->
+                EventTypes.forEach { eventType ->
                     Button(
-                        onClick = { onAddEvent(type) },
+                        onClick = { onAddEvent(eventType.type) },
                         enabled = enabled,
                     ) {
-                        Text(type)
+                        Text(eventType.label)
                     }
                 }
             }
@@ -497,56 +497,76 @@ private fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Text("設定", style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(
             value = wifiInterval,
             onValueChange = { wifiInterval = it },
-            label = { Text("Wi-Fi sample interval ms") },
+            label = { Text("Wi-Fi記録間隔 ms") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = probeInterval,
             onValueChange = { probeInterval = it },
-            label = { Text("Probe interval ms") },
+            label = { Text("疎通確認間隔 ms") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = probeTimeout,
             onValueChange = { probeTimeout = it },
-            label = { Text("Probe timeout ms") },
+            label = { Text("疎通確認タイムアウト ms") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
         )
         HorizontalDivider()
-        Text("Defaults: Wi-Fi 1000ms, probe 2000ms, timeout 1000ms.")
+        Text("初期値: Wi-Fi 1000ms、疎通確認 2000ms、タイムアウト 1000ms。")
         Button(
             onClick = { onSave(wifiInterval, probeInterval, probeTimeout) },
         ) {
-            Text("Save settings")
+            Text("設定を保存")
         }
         Spacer(Modifier.height(8.dp))
-        Text("Export is manual. The app writes a zip only when Export zip is pressed.")
+        Text("エクスポートは手動です。ZIP出力を押したときだけファイルを書き出します。")
     }
 }
 
-private val EventTypes = listOf(
-    "Delay",
-    "Disconnect",
-    "Recover",
-    "BluetoothIssue",
-    "Ros2Issue",
-    "RobotStart",
-    "ApChanged",
-    "Memo",
+private data class EventTypeOption(
+    val type: String,
+    val label: String,
 )
+
+private val EventTypes = listOf(
+    EventTypeOption("Delay", "遅延"),
+    EventTypeOption("Disconnect", "切断"),
+    EventTypeOption("Recover", "復帰"),
+    EventTypeOption("BluetoothIssue", "Bluetooth問題"),
+    EventTypeOption("Ros2Issue", "ROS2問題"),
+    EventTypeOption("RobotStart", "ロボット開始"),
+    EventTypeOption("ApChanged", "AP変更"),
+    EventTypeOption("Memo", "メモ"),
+)
+
+private val EventTypeLabels = EventTypes.associate { it.type to it.label }
 
 private val TimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm:ss")
     .withZone(ZoneId.systemDefault())
 
 private fun formatTime(timestamp: Long): String =
     TimeFormatter.format(Instant.ofEpochMilli(timestamp))
+
+private fun formatSessionStatus(status: SessionStatus): String =
+    when (status) {
+        SessionStatus.RUNNING -> "記録中"
+        SessionStatus.STOPPED -> "停止済み"
+    }
+
+private fun formatEventType(type: String): String =
+    EventTypeLabels[type] ?: if (type.startsWith("EXTERNAL_")) {
+        "外部:${type.removePrefix("EXTERNAL_")}"
+    } else {
+        type
+    }
 
 private fun formatPercent(value: Double?): String =
     value?.let { "%.1f%%".format(it * 100.0) } ?: "-"

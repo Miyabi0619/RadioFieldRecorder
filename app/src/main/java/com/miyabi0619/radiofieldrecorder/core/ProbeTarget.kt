@@ -31,21 +31,21 @@ object ProbeTargetParser {
     ): ProbeTargetParseResult {
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
-            return ProbeTargetParseResult.Error("HTTP target URL is required.")
+            return ProbeTargetParseResult.Error("HTTP URLを入力してください。")
         }
         if (timeoutMs <= 0) {
-            return ProbeTargetParseResult.Error("Timeout must be greater than 0.")
+            return ProbeTargetParseResult.Error("タイムアウトは1以上にしてください。")
         }
 
         val uri = runCatching { URI(trimmedUrl) }.getOrNull()
-            ?: return ProbeTargetParseResult.Error("HTTP target URL is invalid.")
+            ?: return ProbeTargetParseResult.Error("HTTP URLの形式が正しくありません。")
 
         val scheme = uri.scheme?.lowercase()
         if (scheme != "http" && scheme != "https") {
-            return ProbeTargetParseResult.Error("HTTP target must use http or https.")
+            return ProbeTargetParseResult.Error("HTTPターゲットは http または https を指定してください。")
         }
         if (uri.host.isNullOrBlank()) {
-            return ProbeTargetParseResult.Error("HTTP target host is required.")
+            return ProbeTargetParseResult.Error("HTTP URLのホストを入力してください。")
         }
 
         return ProbeTargetParseResult.Success(
@@ -68,16 +68,16 @@ object ProbeTargetParser {
     ): ProbeTargetParseResult {
         val trimmedHost = host.trim()
         if (trimmedHost.isBlank()) {
-            return ProbeTargetParseResult.Error("TCP target host is required.")
+            return ProbeTargetParseResult.Error("TCPホストを入力してください。")
         }
         if (trimmedHost.contains("://")) {
-            return ProbeTargetParseResult.Error("TCP target host must not include a URL scheme.")
+            return ProbeTargetParseResult.Error("TCPホストにはURLスキームを含めないでください。")
         }
         if (port == null || port !in 1..65_535) {
-            return ProbeTargetParseResult.Error("TCP target port must be between 1 and 65535.")
+            return ProbeTargetParseResult.Error("TCPポートは1〜65535で入力してください。")
         }
         if (timeoutMs <= 0) {
-            return ProbeTargetParseResult.Error("Timeout must be greater than 0.")
+            return ProbeTargetParseResult.Error("タイムアウトは1以上にしてください。")
         }
 
         return ProbeTargetParseResult.Success(

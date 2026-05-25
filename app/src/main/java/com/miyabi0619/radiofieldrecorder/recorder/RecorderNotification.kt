@@ -21,10 +21,10 @@ object RecorderNotification {
         val manager = context.getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(
             ChannelId,
-            "Recording",
+            "記録",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Shows active radio field recording sessions."
+            description = "実行中のフィールド記録セッションを表示します。"
         }
         manager.createNotificationChannel(channel)
     }
@@ -48,14 +48,14 @@ object RecorderNotification {
 
         return NotificationCompat.Builder(context, ChannelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Radio Field Recorder")
-            .setContentText("Recording: $sessionName")
+            .setContentTitle(context.getString(R.string.app_name))
+            .setContentText("記録中: $sessionName")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(contentIntent)
             .addAction(
                 R.drawable.ic_launcher_foreground,
-                "Stop",
+                "停止",
                 stopIntent,
             )
             .build()

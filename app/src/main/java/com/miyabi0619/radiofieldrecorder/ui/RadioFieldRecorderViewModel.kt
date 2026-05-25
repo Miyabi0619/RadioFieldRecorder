@@ -91,7 +91,7 @@ class RadioFieldRecorderViewModel(
             }
 
             runCatching {
-                val sessionName = input.sessionName.trim().ifBlank { "Field session" }
+                val sessionName = input.sessionName.trim().ifBlank { "フィールド記録" }
                 val sessionId = repository.createSession(
                     CreateSessionRequest(
                         name = sessionName,
@@ -108,9 +108,9 @@ class RadioFieldRecorderViewModel(
                     sessionName = sessionName,
                 )
                 _selectedDetail.value = repository.getSessionDetail(sessionId)
-                _message.value = "Recording started."
+                _message.value = "記録を開始しました。"
             }.onFailure { error ->
-                _message.value = error.message ?: "Failed to start recording."
+                _message.value = error.message ?: "記録を開始できませんでした。"
             }
         }
     }
@@ -121,9 +121,9 @@ class RadioFieldRecorderViewModel(
                 repository.stopSession(sessionId, System.currentTimeMillis())
                 RecorderServiceController.stop(appContext)
                 selectSession(sessionId)
-                _message.value = "Recording stopped."
+                _message.value = "記録を停止しました。"
             }.onFailure { error ->
-                _message.value = error.message ?: "Failed to stop recording."
+                _message.value = error.message ?: "記録を停止できませんでした。"
             }
         }
     }
@@ -144,7 +144,7 @@ class RadioFieldRecorderViewModel(
                 )
                 _selectedDetail.value = repository.getSessionDetail(sessionId)
             }.onFailure { error ->
-                _message.value = error.message ?: "Failed to add event."
+                _message.value = error.message ?: "イベントを追加できませんでした。"
             }
         }
     }
@@ -159,16 +159,16 @@ class RadioFieldRecorderViewModel(
                 settingsStore.update(
                     RecorderSettings(
                         wifiSampleIntervalMs = wifiIntervalMs.toLongOrNull()
-                            ?: error("Wi-Fi interval must be a number."),
+                            ?: error("Wi-Fi記録間隔は数値で入力してください。"),
                         probeIntervalMs = probeIntervalMs.toLongOrNull()
-                            ?: error("Probe interval must be a number."),
+                            ?: error("疎通確認間隔は数値で入力してください。"),
                         probeTimeoutMs = probeTimeoutMs.toLongOrNull()
-                            ?: error("Probe timeout must be a number."),
+                            ?: error("疎通確認タイムアウトは数値で入力してください。"),
                     ),
                 )
-                _message.value = "Settings saved."
+                _message.value = "設定を保存しました。"
             }.onFailure { error ->
-                _message.value = error.message ?: "Failed to save settings."
+                _message.value = error.message ?: "設定を保存できませんでした。"
             }
         }
     }
@@ -180,11 +180,11 @@ class RadioFieldRecorderViewModel(
         viewModelScope.launch {
             runCatching {
                 val detail = repository.getSessionDetail(sessionId)
-                    ?: error("Session not found.")
+                    ?: error("セッションが見つかりません。")
                 pendingExport = SessionExportArchiveBuilder.build(detail)
                 onPrepared(requireNotNull(pendingExport).fileName)
             }.onFailure { error ->
-                _message.value = error.message ?: "Failed to prepare export."
+                _message.value = error.message ?: "エクスポートを準備できませんでした。"
             }
         }
     }
@@ -197,14 +197,14 @@ class RadioFieldRecorderViewModel(
 
         viewModelScope.launch {
             runCatching {
-                val export = pendingExport ?: error("No export is pending.")
+                val export = pendingExport ?: error("保留中のエクスポートがありません。")
                 appContext.contentResolver.openOutputStream(uri)?.use { output ->
                     output.write(export.bytes)
-                } ?: error("Unable to open export destination.")
+                } ?: error("出力先を開けませんでした。")
                 pendingExport = null
-                _message.value = "Export complete."
+                _message.value = "エクスポートが完了しました。"
             }.onFailure { error ->
-                _message.value = error.message ?: "Failed to write export."
+                _message.value = error.message ?: "エクスポートを書き込めませんでした。"
             }
         }
     }

@@ -20,7 +20,7 @@ class DiagnosticCommentGeneratorTest {
             ),
         )
 
-        assertTrue(comments.any { it.contains("Check Wi-Fi") })
+        assertTrue(comments.any { it.contains("Wi-Fi、AP、接続先ホスト") })
     }
 
     @Test
@@ -38,7 +38,7 @@ class DiagnosticCommentGeneratorTest {
             ),
         )
 
-        assertTrue(comments.any { it.contains("DDS/ROS2/QoS/app logic") })
+        assertTrue(comments.any { it.contains("DDS/ROS2/QoS/アプリ側") })
     }
 
     @Test
@@ -56,6 +56,6 @@ class DiagnosticCommentGeneratorTest {
             ),
         )
 
-        assertTrue(comments.any { it.contains("permissions") })
+        assertTrue(comments.any { it.contains("権限") })
     }
 }
