@@ -5,6 +5,8 @@ import com.miyabi0619.radiofieldrecorder.core.CsvFormatter
 import com.miyabi0619.radiofieldrecorder.core.EventMarkerSnapshot
 import com.miyabi0619.radiofieldrecorder.core.ProbeSampleSnapshot
 import com.miyabi0619.radiofieldrecorder.core.WifiSampleSnapshot
+import com.miyabi0619.radiofieldrecorder.data.local.DdsEndpointSampleEntity
+import com.miyabi0619.radiofieldrecorder.data.local.DdsParticipantSampleEntity
 import com.miyabi0619.radiofieldrecorder.data.repository.SessionDetail
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
@@ -63,10 +65,78 @@ object SessionExportArchiveBuilder {
                         )
                     },
                 ),
+                "dds_participants.csv" to ddsParticipantsCsv(detail.ddsParticipantSamples),
+                "dds_endpoints.csv" to ddsEndpointsCsv(detail.ddsEndpointSamples),
                 "conditions.csv" to conditionsCsv(detail),
             ),
         )
     }
+
+    private fun ddsParticipantsCsv(samples: List<DdsParticipantSampleEntity>): String =
+        buildString {
+            append(
+                CsvFormatter.row(
+                    listOf(
+                        "timestamp",
+                        "participantGuid",
+                        "participantName",
+                        "status",
+                        "firstSeenAt",
+                        "lastSeenAt",
+                    ),
+                ),
+            ).append('\n')
+            samples.forEach { sample ->
+                append(
+                    CsvFormatter.row(
+                        listOf(
+                            sample.timestamp,
+                            sample.participantGuid,
+                            sample.participantName,
+                            sample.status,
+                            sample.firstSeenAt,
+                            sample.lastSeenAt,
+                        ),
+                    ),
+                ).append('\n')
+            }
+        }
+
+    private fun ddsEndpointsCsv(samples: List<DdsEndpointSampleEntity>): String =
+        buildString {
+            append(
+                CsvFormatter.row(
+                    listOf(
+                        "timestamp",
+                        "endpointGuid",
+                        "participantGuid",
+                        "topicName",
+                        "typeName",
+                        "kind",
+                        "status",
+                        "firstSeenAt",
+                        "lastSeenAt",
+                    ),
+                ),
+            ).append('\n')
+            samples.forEach { sample ->
+                append(
+                    CsvFormatter.row(
+                        listOf(
+                            sample.timestamp,
+                            sample.endpointGuid,
+                            sample.participantGuid,
+                            sample.topicName,
+                            sample.typeName,
+                            sample.kind,
+                            sample.status,
+                            sample.firstSeenAt,
+                            sample.lastSeenAt,
+                        ),
+                    ),
+                ).append('\n')
+            }
+        }
 
     private fun conditionsCsv(detail: SessionDetail): String =
         buildString {

@@ -13,6 +13,7 @@ import com.miyabi0619.radiofieldrecorder.data.local.RadioFieldRecorderDatabase
 import com.miyabi0619.radiofieldrecorder.data.repository.RecordingRepository
 import com.miyabi0619.radiofieldrecorder.dds.DdsDiscoveryNativeBridge
 import com.miyabi0619.radiofieldrecorder.dds.DdsDiscoverySnapshot
+import com.miyabi0619.radiofieldrecorder.dds.DdsWifiLockManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +28,7 @@ class RecorderService : Service() {
     private lateinit var repository: RecordingRepository
     private lateinit var wifiMonitor: WifiMonitor
     private lateinit var networkProbeRunner: NetworkProbeRunner
+    private lateinit var ddsWifiLockManager: DdsWifiLockManager
     private var ddsDiscoveryNativeBridge: DdsDiscoveryNativeBridge? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var recordingJob: Job? = null
@@ -38,6 +40,7 @@ class RecorderService : Service() {
         repository = RecordingRepository(database)
         wifiMonitor = WifiMonitor(this)
         networkProbeRunner = NetworkProbeRunner()
+        ddsWifiLockManager = DdsWifiLockManager(this)
         RecorderNotification.ensureChannel(this)
     }
 
@@ -168,10 +171,18 @@ class RecorderService : Service() {
         }.getOrNull()
 
         ddsDiscoveryNativeBridge = bridge
-        return bridge?.takeIf {
+        if (bridge == null) {
+            return null
+        }
+
+        ddsWifiLockManager.acquire()
+        return bridge.takeIf {
             runCatching { it.start(domainId) }
                 .onFailure { error -> Log.w(Tag, "Failed to start DDS discovery monitor", error) }
                 .getOrDefault(false)
+        } ?: run {
+            ddsWifiLockManager.release()
+            null
         }
     }
 
@@ -180,6 +191,7 @@ class RecorderService : Service() {
             runCatching { bridge.stop() }
                 .onFailure { error -> Log.w(Tag, "Failed to stop DDS discovery monitor", error) }
         }
+        ddsWifiLockManager.release()
     }
 
     private fun DdsDiscoverySnapshot.toParticipantEntities(
