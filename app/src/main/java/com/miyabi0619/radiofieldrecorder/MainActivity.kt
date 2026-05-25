@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -190,7 +191,7 @@ private fun SessionsScreen(
         item {
             Text("電波フィールド記録", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Wi-Fi状態、HTTP/TCP疎通、手動イベントを記録します。",
+                "Wi-Fi状態、DDS検出、手動イベントを記録します。",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -213,6 +214,7 @@ private fun NewSessionCard(
 ) {
     var sessionName by rememberSaveable { mutableStateOf("フィールド記録") }
     var memo by rememberSaveable { mutableStateOf("") }
+    var auxiliaryProbeEnabled by rememberSaveable { mutableStateOf(false) }
     var targetType by rememberSaveable { mutableStateOf(TargetInputType.HTTP) }
     var targetLabel by rememberSaveable { mutableStateOf("ROS2 PC") }
     var httpUrl by rememberSaveable { mutableStateOf("http://192.168.1.30:8080/health") }
@@ -238,48 +240,7 @@ private fun NewSessionCard(
                 label = { Text("メモ") },
                 modifier = Modifier.fillMaxWidth(),
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = targetType == TargetInputType.HTTP,
-                    onClick = { targetType = TargetInputType.HTTP },
-                    label = { Text("HTTP") },
-                )
-                FilterChip(
-                    selected = targetType == TargetInputType.TCP,
-                    onClick = { targetType = TargetInputType.TCP },
-                    label = { Text("TCP") },
-                )
-            }
-            OutlinedTextField(
-                value = targetLabel,
-                onValueChange = { targetLabel = it },
-                label = { Text("ターゲット名") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (targetType == TargetInputType.HTTP) {
-                OutlinedTextField(
-                    value = httpUrl,
-                    onValueChange = { httpUrl = it },
-                    label = { Text("HTTP URL") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = tcpHost,
-                        onValueChange = { tcpHost = it },
-                        label = { Text("TCPホスト") },
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = tcpPort,
-                        onValueChange = { tcpPort = it },
-                        label = { Text("ポート") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(0.55f),
-                    )
-                }
-            }
+            Text("DDS監視", style = MaterialTheme.typography.titleSmall)
             OutlinedTextField(
                 value = rosDomainId,
                 onValueChange = { rosDomainId = it },
@@ -287,12 +248,71 @@ private fun NewSessionCard(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
+            Text(
+                "記録開始時にこのDDSドメインへ参加し、ParticipantとTopic Endpointの検出状態を記録します。",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Checkbox(
+                    checked = auxiliaryProbeEnabled,
+                    onCheckedChange = { auxiliaryProbeEnabled = it },
+                )
+                Text("補助のHTTP/TCP疎通確認も記録する")
+            }
+            if (auxiliaryProbeEnabled) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = targetType == TargetInputType.HTTP,
+                        onClick = { targetType = TargetInputType.HTTP },
+                        label = { Text("HTTP") },
+                    )
+                    FilterChip(
+                        selected = targetType == TargetInputType.TCP,
+                        onClick = { targetType = TargetInputType.TCP },
+                        label = { Text("TCP") },
+                    )
+                }
+                OutlinedTextField(
+                    value = targetLabel,
+                    onValueChange = { targetLabel = it },
+                    label = { Text("補助ターゲット名") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (targetType == TargetInputType.HTTP) {
+                    OutlinedTextField(
+                        value = httpUrl,
+                        onValueChange = { httpUrl = it },
+                        label = { Text("HTTP URL") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = tcpHost,
+                            onValueChange = { tcpHost = it },
+                            label = { Text("TCPホスト") },
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = tcpPort,
+                            onValueChange = { tcpPort = it },
+                            label = { Text("ポート") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(0.55f),
+                        )
+                    }
+                }
+            }
             Button(
                 onClick = {
                     onStart(
                         StartRecordingInput(
                             sessionName = sessionName,
                             memo = memo,
+                            auxiliaryProbeEnabled = auxiliaryProbeEnabled,
                             targetType = targetType,
                             targetLabel = targetLabel,
                             httpUrl = httpUrl,

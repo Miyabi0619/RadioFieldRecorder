@@ -31,6 +31,7 @@ enum class TargetInputType {
 data class StartRecordingInput(
     val sessionName: String,
     val memo: String,
+    val auxiliaryProbeEnabled: Boolean,
     val targetType: TargetInputType,
     val targetLabel: String,
     val httpUrl: String,
@@ -72,22 +73,33 @@ class RadioFieldRecorderViewModel(
 
     fun startRecording(input: StartRecordingInput) {
         viewModelScope.launch {
-            val target = when (input.targetType) {
-                TargetInputType.HTTP -> ProbeTargetParser.parseHttp(
-                    label = input.targetLabel,
-                    url = input.httpUrl,
-                    timeoutMs = settings.value.probeTimeoutMs.toInt(),
-                )
-                TargetInputType.TCP -> ProbeTargetParser.parseTcp(
-                    label = input.targetLabel,
-                    host = input.tcpHost,
-                    port = input.tcpPort.toIntOrNull(),
-                    timeoutMs = settings.value.probeTimeoutMs.toInt(),
-                )
-            }
-            if (target is ProbeTargetParseResult.Error) {
-                _message.value = target.message
+            val rosDomainId = input.rosDomainId.trim().toIntOrNull()
+            if (rosDomainId == null || rosDomainId < 0) {
+                _message.value = "ROS_DOMAIN_IDは0以上の数値で入力してください。"
                 return@launch
+            }
+
+            val target = if (input.auxiliaryProbeEnabled) {
+                when (input.targetType) {
+                    TargetInputType.HTTP -> ProbeTargetParser.parseHttp(
+                        label = input.targetLabel,
+                        url = input.httpUrl,
+                        timeoutMs = settings.value.probeTimeoutMs.toInt(),
+                    )
+                    TargetInputType.TCP -> ProbeTargetParser.parseTcp(
+                        label = input.targetLabel,
+                        host = input.tcpHost,
+                        port = input.tcpPort.toIntOrNull(),
+                        timeoutMs = settings.value.probeTimeoutMs.toInt(),
+                    )
+                }.also { result ->
+                    if (result is ProbeTargetParseResult.Error) {
+                        _message.value = result.message
+                        return@launch
+                    }
+                } as ProbeTargetParseResult.Success
+            } else {
+                null
             }
 
             runCatching {
@@ -96,9 +108,9 @@ class RadioFieldRecorderViewModel(
                     CreateSessionRequest(
                         name = sessionName,
                         memo = input.memo,
-                        targets = listOf((target as ProbeTargetParseResult.Success).target),
+                        targets = target?.let { listOf(it.target) } ?: emptyList(),
                         settings = settings.value,
-                        rosDomainId = input.rosDomainId.toIntOrNull(),
+                        rosDomainId = rosDomainId,
                         startedAt = System.currentTimeMillis(),
                     ),
                 )
