@@ -7,8 +7,12 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.miyabi0619.radiofieldrecorder.data.local.DdsEndpointSampleEntity
+import com.miyabi0619.radiofieldrecorder.data.local.DdsParticipantSampleEntity
 import com.miyabi0619.radiofieldrecorder.data.local.RadioFieldRecorderDatabase
 import com.miyabi0619.radiofieldrecorder.data.repository.RecordingRepository
+import com.miyabi0619.radiofieldrecorder.dds.DdsDiscoveryNativeBridge
+import com.miyabi0619.radiofieldrecorder.dds.DdsDiscoverySnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +27,7 @@ class RecorderService : Service() {
     private lateinit var repository: RecordingRepository
     private lateinit var wifiMonitor: WifiMonitor
     private lateinit var networkProbeRunner: NetworkProbeRunner
+    private var ddsDiscoveryNativeBridge: DdsDiscoveryNativeBridge? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var recordingJob: Job? = null
     private var activeSessionId: Long? = null
@@ -61,6 +66,7 @@ class RecorderService : Service() {
 
     override fun onDestroy() {
         recordingJob?.cancel()
+        stopDdsDiscovery()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -86,6 +92,7 @@ class RecorderService : Service() {
         recordingJob?.cancel()
         recordingJob = null
         activeSessionId = null
+        stopDdsDiscovery()
 
         if (sessionId != null) {
             serviceScope.launch {
@@ -113,6 +120,27 @@ class RecorderService : Service() {
         val wifiIntervalMs = detail.session.wifiSampleIntervalMs
         val probeIntervalMs = detail.session.probeIntervalMs
         val targets = detail.targets
+        val ddsJob = detail.session.rosDomainId?.let { domainId ->
+            val bridge = startDdsDiscovery(domainId)
+            bridge?.let {
+                serviceScope.launchLoop(intervalMs = probeIntervalMs) {
+                    val snapshot = it.snapshot()
+                    val sampledAt = SystemRecorderClock.nowMillis()
+                    repository.addDdsParticipantSamples(
+                        snapshot.toParticipantEntities(
+                            sessionId = sessionId,
+                            sampledAt = sampledAt,
+                        ),
+                    )
+                    repository.addDdsEndpointSamples(
+                        snapshot.toEndpointEntities(
+                            sessionId = sessionId,
+                            sampledAt = sampledAt,
+                        ),
+                    )
+                }
+            }
+        }
 
         val wifiJob = serviceScope.launchLoop(intervalMs = wifiIntervalMs) {
             val sample = wifiMonitor.sample()
@@ -129,7 +157,65 @@ class RecorderService : Service() {
 
         wifiJob.join()
         probeJob.join()
+        ddsJob?.join()
     }
+
+    private fun startDdsDiscovery(domainId: Int): DdsDiscoveryNativeBridge? {
+        val bridge = ddsDiscoveryNativeBridge ?: runCatching {
+            DdsDiscoveryNativeBridge()
+        }.onFailure { error ->
+            Log.w(Tag, "Failed to load DDS discovery monitor", error)
+        }.getOrNull()
+
+        ddsDiscoveryNativeBridge = bridge
+        return bridge?.takeIf {
+            runCatching { it.start(domainId) }
+                .onFailure { error -> Log.w(Tag, "Failed to start DDS discovery monitor", error) }
+                .getOrDefault(false)
+        }
+    }
+
+    private fun stopDdsDiscovery() {
+        ddsDiscoveryNativeBridge?.let { bridge ->
+            runCatching { bridge.stop() }
+                .onFailure { error -> Log.w(Tag, "Failed to stop DDS discovery monitor", error) }
+        }
+    }
+
+    private fun DdsDiscoverySnapshot.toParticipantEntities(
+        sessionId: Long,
+        sampledAt: Long,
+    ): List<DdsParticipantSampleEntity> =
+        participants.map { participant ->
+            DdsParticipantSampleEntity(
+                sessionId = sessionId,
+                timestamp = sampledAt,
+                participantGuid = participant.guid,
+                participantName = participant.name,
+                status = participant.status.name,
+                firstSeenAt = participant.firstSeenAt,
+                lastSeenAt = participant.lastSeenAt,
+            )
+        }
+
+    private fun DdsDiscoverySnapshot.toEndpointEntities(
+        sessionId: Long,
+        sampledAt: Long,
+    ): List<DdsEndpointSampleEntity> =
+        endpoints.map { endpoint ->
+            DdsEndpointSampleEntity(
+                sessionId = sessionId,
+                timestamp = sampledAt,
+                endpointGuid = endpoint.guid,
+                participantGuid = endpoint.participantGuid,
+                topicName = endpoint.topicName,
+                typeName = endpoint.typeName,
+                kind = endpoint.kind.name,
+                status = endpoint.status.name,
+                firstSeenAt = endpoint.firstSeenAt,
+                lastSeenAt = endpoint.lastSeenAt,
+            )
+        }
 
     private fun CoroutineScope.launchLoop(
         intervalMs: Long,

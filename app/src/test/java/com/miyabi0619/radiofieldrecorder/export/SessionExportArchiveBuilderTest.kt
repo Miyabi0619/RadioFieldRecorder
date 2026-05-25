@@ -53,6 +53,8 @@ class SessionExportArchiveBuilderTest {
                 events = listOf(
                     EventMarkerEntity(1L, 5L, 130L, "Delay", "Delay", "lag"),
                 ),
+                ddsParticipantSamples = emptyList(),
+                ddsEndpointSamples = emptyList(),
                 summary = SessionSummary(
                     probeCount = 1,
                     probeFailureRate = 0.0,

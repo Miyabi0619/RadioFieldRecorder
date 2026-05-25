@@ -2,6 +2,10 @@ package com.miyabi0619.radiofieldrecorder.data.repository
 
 import com.miyabi0619.radiofieldrecorder.core.ProbeTargetParser
 import com.miyabi0619.radiofieldrecorder.core.ProbeTargetParseResult
+import com.miyabi0619.radiofieldrecorder.data.local.DdsEndpointSampleDao
+import com.miyabi0619.radiofieldrecorder.data.local.DdsEndpointSampleEntity
+import com.miyabi0619.radiofieldrecorder.data.local.DdsParticipantSampleDao
+import com.miyabi0619.radiofieldrecorder.data.local.DdsParticipantSampleEntity
 import com.miyabi0619.radiofieldrecorder.data.local.EventMarkerDao
 import com.miyabi0619.radiofieldrecorder.data.local.EventMarkerEntity
 import com.miyabi0619.radiofieldrecorder.data.local.ProbeSampleDao
@@ -123,6 +127,35 @@ class RecordingRepositoryTest {
                 memo = "operator noticed lag",
             ),
         )
+        repository.addDdsParticipantSamples(
+            listOf(
+                DdsParticipantSampleEntity(
+                    sessionId = sessionId,
+                    timestamp = 105L,
+                    participantGuid = "participant-1",
+                    participantName = "ros-pc",
+                    status = "VISIBLE",
+                    firstSeenAt = 105L,
+                    lastSeenAt = 105L,
+                ),
+            ),
+        )
+        repository.addDdsEndpointSamples(
+            listOf(
+                DdsEndpointSampleEntity(
+                    sessionId = sessionId,
+                    timestamp = 106L,
+                    endpointGuid = "endpoint-1",
+                    participantGuid = "participant-1",
+                    topicName = "rt/chatter",
+                    typeName = "std_msgs::msg::dds_::String_",
+                    kind = "WRITER",
+                    status = "VISIBLE",
+                    firstSeenAt = 106L,
+                    lastSeenAt = 106L,
+                ),
+            ),
+        )
 
         val detail = repository.getSessionDetail(sessionId)
 
@@ -130,6 +163,8 @@ class RecordingRepositoryTest {
         assertEquals(1, detail!!.wifiSamples.size)
         assertEquals(2, detail.probeSamples.size)
         assertEquals(1, detail.events.size)
+        assertEquals(1, detail.ddsParticipantSamples.size)
+        assertEquals(1, detail.ddsEndpointSamples.size)
         assertEquals(2, detail.summary.probeCount)
         assertEquals(0.5, detail.summary.probeFailureRate!!, 0.0001)
         assertEquals(12.0, detail.summary.averageLatencyMs!!, 0.0001)
@@ -143,6 +178,8 @@ private class FakeRecordingStore {
     val wifiSampleDao = FakeWifiSampleDao()
     val probeSampleDao = FakeProbeSampleDao()
     val eventMarkerDao = FakeEventMarkerDao()
+    val ddsParticipantSampleDao = FakeDdsParticipantSampleDao()
+    val ddsEndpointSampleDao = FakeDdsEndpointSampleDao()
     var transactionRan = false
 
     fun repository(): RecordingRepository =
@@ -152,6 +189,8 @@ private class FakeRecordingStore {
             wifiSampleDao = wifiSampleDao,
             probeSampleDao = probeSampleDao,
             eventMarkerDao = eventMarkerDao,
+            ddsParticipantSampleDao = ddsParticipantSampleDao,
+            ddsEndpointSampleDao = ddsEndpointSampleDao,
             runLongTransaction = { block ->
                 transactionRan = true
                 block()
@@ -249,4 +288,34 @@ private class FakeEventMarkerDao : EventMarkerDao {
 
     override suspend fun getEventsForSession(sessionId: Long): List<EventMarkerEntity> =
         events.filter { it.sessionId == sessionId }.sortedWith(compareBy({ it.timestamp }, { it.id }))
+}
+
+private class FakeDdsParticipantSampleDao : DdsParticipantSampleDao {
+    private val samples = mutableListOf<DdsParticipantSampleEntity>()
+    private var nextId = 1L
+
+    override suspend fun insertAll(samples: List<DdsParticipantSampleEntity>): List<Long> =
+        samples.map { sample ->
+            val id = nextId++
+            this.samples += sample.copy(id = id)
+            id
+        }
+
+    override suspend fun getSamplesForSession(sessionId: Long): List<DdsParticipantSampleEntity> =
+        samples.filter { it.sessionId == sessionId }.sortedWith(compareBy({ it.timestamp }, { it.id }))
+}
+
+private class FakeDdsEndpointSampleDao : DdsEndpointSampleDao {
+    private val samples = mutableListOf<DdsEndpointSampleEntity>()
+    private var nextId = 1L
+
+    override suspend fun insertAll(samples: List<DdsEndpointSampleEntity>): List<Long> =
+        samples.map { sample ->
+            val id = nextId++
+            this.samples += sample.copy(id = id)
+            id
+        }
+
+    override suspend fun getSamplesForSession(sessionId: Long): List<DdsEndpointSampleEntity> =
+        samples.filter { it.sessionId == sessionId }.sortedWith(compareBy({ it.timestamp }, { it.id }))
 }

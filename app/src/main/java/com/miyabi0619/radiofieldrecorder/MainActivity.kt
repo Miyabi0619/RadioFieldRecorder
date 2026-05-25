@@ -378,6 +378,9 @@ private fun DetailScreen(
             SummaryCard(detail)
         }
         item {
+            DdsDiscoveryCard(detail)
+        }
+        item {
             EventMarkerCard(
                 memo = eventMemo,
                 onMemoChange = { eventMemo = it },
@@ -412,6 +415,60 @@ private fun DetailScreen(
                         "${if (sample.success) "成功" else "失敗"} " +
                         "${sample.latencyMs?.let { "${it}ms" } ?: sample.errorMessage.orEmpty()}",
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DdsDiscoveryCard(detail: SessionDetail) {
+    val latestParticipants = detail.ddsParticipantSamples
+        .groupBy { it.participantGuid }
+        .values
+        .mapNotNull { samples -> samples.maxByOrNull { it.timestamp } }
+        .sortedByDescending { it.lastSeenAt }
+    val latestEndpoints = detail.ddsEndpointSamples
+        .groupBy { it.endpointGuid }
+        .values
+        .mapNotNull { samples -> samples.maxByOrNull { it.timestamp } }
+        .sortedByDescending { it.lastSeenAt }
+    val visibleParticipants = latestParticipants.count { it.status == "VISIBLE" }
+    val visibleEndpoints = latestEndpoints.count { it.status == "VISIBLE" }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("DDS検出", style = MaterialTheme.typography.titleMedium)
+            detail.session.rosDomainId?.let { domainId ->
+                Text("ROS_DOMAIN_ID: $domainId")
+            } ?: Text("ROS_DOMAIN_ID: 未設定")
+            Text("検出中のParticipant: $visibleParticipants / ${latestParticipants.size}")
+            Text("検出中のTopic Endpoint: $visibleEndpoints / ${latestEndpoints.size}")
+
+            if (latestParticipants.isEmpty()) {
+                Text("Participantはまだ検出されていません。")
+            } else {
+                Text("Participant", style = MaterialTheme.typography.labelLarge)
+                latestParticipants.take(5).forEach { participant ->
+                    Text(
+                        "${formatDdsStatus(participant.status)} " +
+                            "${participant.participantName ?: participant.participantGuid} " +
+                            "最終 ${formatTime(participant.lastSeenAt)}",
+                    )
+                }
+            }
+
+            if (latestEndpoints.isNotEmpty()) {
+                Text("Topic Endpoint", style = MaterialTheme.typography.labelLarge)
+                latestEndpoints.take(10).forEach { endpoint ->
+                    Text(
+                        "${formatDdsStatus(endpoint.status)} " +
+                            "${formatDdsEndpointKind(endpoint.kind)} " +
+                            "${endpoint.topicName} (${endpoint.typeName})",
+                    )
+                }
             }
         }
     }
@@ -566,6 +623,21 @@ private fun formatEventType(type: String): String =
         "外部:${type.removePrefix("EXTERNAL_")}"
     } else {
         type
+    }
+
+private fun formatDdsStatus(status: String): String =
+    when (status) {
+        "VISIBLE" -> "検出中"
+        "LOST" -> "消失"
+        "IGNORED" -> "無視"
+        else -> "不明"
+    }
+
+private fun formatDdsEndpointKind(kind: String): String =
+    when (kind) {
+        "WRITER" -> "Publisher"
+        "READER" -> "Subscriber"
+        else -> kind
     }
 
 private fun formatPercent(value: Double?): String =

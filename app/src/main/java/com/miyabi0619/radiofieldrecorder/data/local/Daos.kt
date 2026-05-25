@@ -80,3 +80,21 @@ interface EventMarkerDao {
     @Query("SELECT * FROM event_markers WHERE sessionId = :sessionId ORDER BY timestamp ASC, id ASC")
     suspend fun getEventsForSession(sessionId: Long): List<EventMarkerEntity>
 }
+
+@Dao
+interface DdsParticipantSampleDao {
+    @Insert
+    suspend fun insertAll(samples: List<DdsParticipantSampleEntity>): List<Long>
+
+    @Query("SELECT * FROM dds_participant_samples WHERE sessionId = :sessionId ORDER BY timestamp ASC, id ASC")
+    suspend fun getSamplesForSession(sessionId: Long): List<DdsParticipantSampleEntity>
+}
+
+@Dao
+interface DdsEndpointSampleDao {
+    @Insert
+    suspend fun insertAll(samples: List<DdsEndpointSampleEntity>): List<Long>
+
+    @Query("SELECT * FROM dds_endpoint_samples WHERE sessionId = :sessionId ORDER BY timestamp ASC, id ASC")
+    suspend fun getSamplesForSession(sessionId: Long): List<DdsEndpointSampleEntity>
+}

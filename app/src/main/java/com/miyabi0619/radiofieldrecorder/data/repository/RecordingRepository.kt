@@ -9,6 +9,10 @@ import com.miyabi0619.radiofieldrecorder.core.SessionSummaryCalculator
 import com.miyabi0619.radiofieldrecorder.core.WifiSampleSnapshot
 import com.miyabi0619.radiofieldrecorder.data.local.EventMarkerDao
 import com.miyabi0619.radiofieldrecorder.data.local.EventMarkerEntity
+import com.miyabi0619.radiofieldrecorder.data.local.DdsEndpointSampleDao
+import com.miyabi0619.radiofieldrecorder.data.local.DdsEndpointSampleEntity
+import com.miyabi0619.radiofieldrecorder.data.local.DdsParticipantSampleDao
+import com.miyabi0619.radiofieldrecorder.data.local.DdsParticipantSampleEntity
 import com.miyabi0619.radiofieldrecorder.data.local.ProbeSampleDao
 import com.miyabi0619.radiofieldrecorder.data.local.ProbeSampleEntity
 import com.miyabi0619.radiofieldrecorder.data.local.ProbeTargetDao
@@ -40,6 +44,8 @@ data class SessionDetail(
     val wifiSamples: List<WifiSampleEntity>,
     val probeSamples: List<ProbeSampleEntity>,
     val events: List<EventMarkerEntity>,
+    val ddsParticipantSamples: List<DdsParticipantSampleEntity>,
+    val ddsEndpointSamples: List<DdsEndpointSampleEntity>,
     val summary: SessionSummary,
 )
 
@@ -49,6 +55,8 @@ class RecordingRepository(
     private val wifiSampleDao: WifiSampleDao,
     private val probeSampleDao: ProbeSampleDao,
     private val eventMarkerDao: EventMarkerDao,
+    private val ddsParticipantSampleDao: DdsParticipantSampleDao,
+    private val ddsEndpointSampleDao: DdsEndpointSampleDao,
     private val runLongTransaction: suspend (suspend () -> Long) -> Long,
 ) {
     constructor(database: RadioFieldRecorderDatabase) : this(
@@ -57,6 +65,8 @@ class RecordingRepository(
         wifiSampleDao = database.wifiSampleDao(),
         probeSampleDao = database.probeSampleDao(),
         eventMarkerDao = database.eventMarkerDao(),
+        ddsParticipantSampleDao = database.ddsParticipantSampleDao(),
+        ddsEndpointSampleDao = database.ddsEndpointSampleDao(),
         runLongTransaction = { block -> database.withTransaction { block() } },
     )
 
@@ -121,6 +131,12 @@ class RecordingRepository(
     suspend fun addEvent(event: EventMarkerEntity): Long =
         eventMarkerDao.insert(event)
 
+    suspend fun addDdsParticipantSamples(samples: List<DdsParticipantSampleEntity>): List<Long> =
+        if (samples.isEmpty()) emptyList() else ddsParticipantSampleDao.insertAll(samples)
+
+    suspend fun addDdsEndpointSamples(samples: List<DdsEndpointSampleEntity>): List<Long> =
+        if (samples.isEmpty()) emptyList() else ddsEndpointSampleDao.insertAll(samples)
+
     suspend fun addEvent(
         sessionId: Long,
         timestamp: Long,
@@ -144,6 +160,8 @@ class RecordingRepository(
         val wifiSamples = wifiSampleDao.getSamplesForSession(sessionId)
         val probeSamples = probeSampleDao.getSamplesForSession(sessionId)
         val events = eventMarkerDao.getEventsForSession(sessionId)
+        val ddsParticipantSamples = ddsParticipantSampleDao.getSamplesForSession(sessionId)
+        val ddsEndpointSamples = ddsEndpointSampleDao.getSamplesForSession(sessionId)
         val summary = SessionSummaryCalculator.calculate(
             probes = probeSamples.map { it.toSnapshot() },
             wifiSamples = wifiSamples.map { it.toSnapshot() },
@@ -156,6 +174,8 @@ class RecordingRepository(
             wifiSamples = wifiSamples,
             probeSamples = probeSamples,
             events = events,
+            ddsParticipantSamples = ddsParticipantSamples,
+            ddsEndpointSamples = ddsEndpointSamples,
             summary = summary,
         )
     }

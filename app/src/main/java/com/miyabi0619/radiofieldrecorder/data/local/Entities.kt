@@ -128,3 +128,63 @@ data class EventMarkerEntity(
     val label: String,
     val memo: String?,
 )
+
+@Entity(
+    tableName = "dds_participant_samples",
+    foreignKeys = [
+        ForeignKey(
+            entity = SessionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sessionId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index("sessionId"),
+        Index(value = ["sessionId", "timestamp"]),
+        Index(value = ["sessionId", "participantGuid"]),
+    ],
+)
+data class DdsParticipantSampleEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val sessionId: Long,
+    val timestamp: Long,
+    val participantGuid: String,
+    val participantName: String?,
+    val status: String,
+    val firstSeenAt: Long,
+    val lastSeenAt: Long,
+)
+
+@Entity(
+    tableName = "dds_endpoint_samples",
+    foreignKeys = [
+        ForeignKey(
+            entity = SessionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sessionId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index("sessionId"),
+        Index(value = ["sessionId", "timestamp"]),
+        Index(value = ["sessionId", "endpointGuid"]),
+        Index(value = ["sessionId", "topicName"]),
+    ],
+)
+data class DdsEndpointSampleEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val sessionId: Long,
+    val timestamp: Long,
+    val endpointGuid: String,
+    val participantGuid: String?,
+    val topicName: String,
+    val typeName: String,
+    val kind: String,
+    val status: String,
+    val firstSeenAt: Long,
+    val lastSeenAt: Long,
+)
